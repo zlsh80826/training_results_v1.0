@@ -21,7 +21,7 @@ set -euxo pipefail
 : "${CONT:?CONT not set}"
 
 # Vars with defaults
-: "${NEXP:=5}"
+: "${NEXP:=1}"
 : "${DATESTAMP:=$(date +'%y%m%d%H%M%S%N')}"
 : "${CLEAR_CACHES:=1}"
 : "${LOGDIR:=$(pwd)/results}"
@@ -65,11 +65,11 @@ PHASE1="\
     --train_batch_size=${BATCHSIZE:-10} \
     --learning_rate=${LR:-6e-3} \
     --warmup_proportion=${WARMUP_PROPORTION:-0.0} \
-    --max_steps=7038 \
-    --num_steps_per_checkpoint=2500 \
+    --max_steps=${MAX_STEPS} \
     --max_seq_length=128 \
     --max_predictions_per_seq=20 \
     --input_dir=/workspace/data \
+    --init_checkpoint=/workspace/phase1/model.ckpt-28252.pt \
     "
 PHASE2="\
     --train_batch_size=${BATCHSIZE:-10} \
@@ -97,6 +97,7 @@ EVAL_ITER_START_SAMPLES=${EVAL_ITER_START_SAMPLES:-100000}
 EVAL_ITER_SAMPLES=${EVAL_ITER_SAMPLES:-100000}
 
 declare -a CMD
+unset SLURM_LOCALID
 if [ -n "${SLURM_LOCALID-}" ]; then
   # Mode 1: Slurm launched a task for each GPU and set some envvars; no need for parallel launch
   if [ "${SLURM_NTASKS}" -gt "${SLURM_JOB_NUM_NODES}" ]; then
@@ -119,7 +120,7 @@ USE_DDP=${USE_DDP:-0}
 BERT_CMD="\
     ${CMD[@]} \
     /workspace/bert/run_pretraining.py \
-    $PHASE2 \
+    $PHASE1 \
     --do_train \
     --skip_checkpoint \
     --train_mlm_accuracy_window_size=0 \
@@ -133,7 +134,7 @@ BERT_CMD="\
     --fp16 --fused_gelu_bias --fused_mha ${EXTRA_PARAMS} \
     --distributed_lamb   --dwu-num-rs-pg=1 --dwu-num-ar-pg=1 --dwu-num-blocks=1  \
     --gradient_accumulation_steps=${GRADIENT_STEPS} \
-    --log_freq=0 \
+    --log_freq=200 \
     --bert_config_path=/workspace/phase1/bert_config.json"
 
 if [[ $USE_DDP != 1 || $GRADIENT_STEPS != 1 ]]; then
@@ -147,7 +148,7 @@ nvidia-docker run --rm --init --detach \
     --name="${_cont_name}" "${_cont_mounts[@]}" \
     "${CONT}" sleep infinity
 #make sure container has time to finish initialization
-sleep 30
+sleep 5
 docker exec -it "${_cont_name}" true
 
 # Run experiments
