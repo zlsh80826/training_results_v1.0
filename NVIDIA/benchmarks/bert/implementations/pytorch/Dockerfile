@@ -15,6 +15,11 @@
 ARG FROM_IMAGE_NAME=nvcr.io/nvidia/pytorch:21.05-py3
 FROM ${FROM_IMAGE_NAME}
 
+ARG uid
+ARG gid
+ARG username
+ARG groupname
+
 # Install dependencies
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
@@ -23,12 +28,28 @@ RUN apt-get update \
         iputils-ping \
         pbzip2 \
         pv \
+        sudo \
  && rm -rf /var/lib/apt/lists/*
 
+RUN addgroup --gid ${uid} ${username}
+RUN groupmod --gid 3000 dip
+RUN addgroup --gid ${gid} ${groupname}
+RUN adduser --disabled-password --gecos GECOS -u ${uid} -gid ${gid} ${username}
+RUN adduser ${username} sudo
+RUN usermod -a -G ${groupname} ${username}
+RUN usermod -a -G ${groupname} root
+RUN usermod -a -G root ${username}
+RUN echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+
+# RUN mkdir /workspace
+RUN chown -R ${username}:${groupname} /workspace
+USER ${username}
+
+RUN mkdir /workspace/bert
 WORKDIR /workspace/bert
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade https://github.com/mlperf/logging/archive/5bc16bf.zip \
- && pip install --no-cache-dir -r requirements.txt
+ && pip install --no-cache-dir -r requirements.txt --user
 
 # Preprocessing
 WORKDIR /workspace
@@ -38,7 +59,7 @@ RUN cd /workspace/wikiextractor && git checkout e4abb4cbd019b0257824ee47c23dd163
 # Install BERT
 ENV BERT_PREP_WORKING_DIR /workspace/bert/data
 WORKDIR /workspace/bert
-COPY . .
+COPY --chown=${username} . .
 
 ENV PYTHONPATH "/workspace/bert"
 
