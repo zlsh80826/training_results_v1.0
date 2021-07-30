@@ -1090,7 +1090,7 @@ def main():
             num_files = len(files)
         else:
             files = [os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir) if
-                     os.path.isfile(os.path.join(args.input_dir, f)) and 'part' in f]
+                     os.path.isfile(os.path.join(args.input_dir, f))]
             files.sort()
             num_files = len(files)
             random.Random(shuffling_seeds[epoch]).shuffle(files)
@@ -1292,7 +1292,7 @@ def main():
             # Reshuffle file list on subsequent epochs
             if not first_epoch:
                 files = [os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir) if
-                         os.path.isfile(os.path.join(args.input_dir, f)) and 'part' in f]
+                         os.path.isfile(os.path.join(args.input_dir, f))]
                 files.sort()
                 num_files = len(files)
                 random.Random(shuffling_seeds[epoch]).shuffle(files)
